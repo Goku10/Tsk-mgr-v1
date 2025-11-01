@@ -1,0 +1,111 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { LogOut, Plus } from 'lucide-react';
+
+function Dashboard() {
+  const [tasks, setTasks] = useState([
+    '1. Finish homework',
+    '2. Call John',
+    '3. Buy groceries'
+  ]);
+  const [newTask, setNewTask] = useState('');
+  const navigate = useNavigate();
+
+  const handleAddTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newTask.trim()) {
+      setTasks([...tasks, `${tasks.length + 1}. ${newTask}`]);
+      setNewTask('');
+    }
+  };
+
+  const handleLogout = () => {
+    navigate('/');
+  };
+
+  return (
+    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+      {/* Futuristic grid overlay */}
+      <div className="absolute inset-0 bg-grid-pattern opacity-20"></div>
+
+      {/* Metallic gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-500/5 to-transparent"></div>
+
+      {/* Glow effects */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-500/20 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl"></div>
+
+      {/* Main content */}
+      <div className="relative z-10 w-full max-w-4xl mx-auto px-6 py-16">
+        <div className="bg-slate-900/40 backdrop-blur-xl border-2 border-cyan-400/30 rounded-2xl p-10 shadow-2xl shadow-cyan-500/20">
+          <h1 className="text-6xl font-bold mb-12 text-center text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-300 to-cyan-400 tracking-wide">
+            Your Tasks
+          </h1>
+
+          {/* Task List */}
+          <div className="mb-12 bg-slate-800/30 backdrop-blur-sm border-2 border-cyan-400/20 rounded-xl p-8">
+            <ul className="space-y-6">
+              {tasks.map((task, index) => (
+                <li
+                  key={index}
+                  className="text-white text-xl font-medium tracking-wide pl-2 border-l-4 border-cyan-400 hover:border-cyan-300 transition-colors duration-300"
+                >
+                  {task}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Add Task Form */}
+          <form onSubmit={handleAddTask} className="mb-12">
+            <label
+              htmlFor="newTask"
+              className="block text-cyan-300 font-semibold mb-4 text-xl tracking-wide"
+            >
+              New Task
+            </label>
+            <div className="flex gap-4">
+              <input
+                id="newTask"
+                type="text"
+                value={newTask}
+                onChange={(e) => setNewTask(e.target.value)}
+                placeholder="Enter a new task"
+                className="flex-1 px-5 py-4 bg-slate-800/50 border-2 border-cyan-400/30 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all duration-300 backdrop-blur-sm text-lg"
+              />
+              <button
+                type="submit"
+                className="group relative px-8 py-4 bg-gradient-to-r from-cyan-500/30 to-blue-500/30 border-2 border-cyan-400/50 rounded-lg text-cyan-300 font-bold text-lg tracking-wider hover:border-cyan-300 hover:shadow-lg hover:shadow-cyan-500/50 transition-all duration-300 backdrop-blur-sm flex items-center gap-2 min-w-[180px] justify-center"
+              >
+                <Plus className="w-5 h-5" />
+                <span className="relative z-10">Add Task</span>
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/0 to-blue-500/0 group-hover:from-cyan-500/40 group-hover:to-blue-500/40 rounded-lg transition-all duration-300"></div>
+              </button>
+            </div>
+          </form>
+
+          {/* Logout Button */}
+          <div className="flex justify-center pt-8 border-t-2 border-cyan-400/20">
+            <button
+              onClick={handleLogout}
+              className="group relative px-10 py-5 bg-gradient-to-r from-slate-500/30 to-cyan-500/30 border-2 border-slate-400/50 rounded-lg text-slate-300 font-bold text-xl tracking-wider hover:border-slate-300 hover:shadow-lg hover:shadow-slate-500/50 transition-all duration-300 backdrop-blur-sm flex items-center gap-3"
+            >
+              <LogOut className="w-6 h-6" />
+              <span className="relative z-10">Logout</span>
+              <div className="absolute inset-0 bg-gradient-to-r from-slate-500/0 to-cyan-500/0 group-hover:from-slate-500/40 group-hover:to-cyan-500/40 rounded-lg transition-all duration-300"></div>
+            </button>
+          </div>
+
+          {/* Decorative elements */}
+          <div className="mt-10 flex justify-center gap-2">
+            <div className="w-2 h-2 bg-cyan-400 rounded-full animate-ping-slow"></div>
+            <div className="w-2 h-2 bg-blue-400 rounded-full animate-ping-slow" style={{ animationDelay: '0.2s' }}></div>
+            <div className="w-2 h-2 bg-cyan-400 rounded-full animate-ping-slow" style={{ animationDelay: '0.4s' }}></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default Dashboard;
