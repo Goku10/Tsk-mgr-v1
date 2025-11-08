@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Plus, Trash2, Sparkles, Save } from 'lucide-react';
+import { LogOut, Plus, Trash2, Sparkles, Save, Search } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Profile from '../components/Profile';
 
@@ -20,6 +20,14 @@ type Subtask = {
   created_at: string;
 };
 
+type SearchResult = {
+  id: string;
+  title: string;
+  priority: string;
+  status: string;
+  similarity: number;
+};
+
 function Dashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [subtasks, setSubtasks] = useState<Record<string, Subtask[]>>({});
@@ -31,6 +39,9 @@ function Dashboard() {
   const [generatingSuggestions, setGeneratingSuggestions] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Record<string, string[]>>({});
   const [savingSubtask, setSavingSubtask] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -90,16 +101,35 @@ function Dashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { error } = await supabase
+      const { data: insertedTask, error } = await supabase
         .from('tasks')
         .insert([{
           user_id: user.id,
           title: newTask,
           priority,
           status: 'pending'
-        }]);
+        }])
+        .select()
+        .single();
 
       if (error) throw error;
+
+      if (insertedTask) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-task-embedding`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              taskId: insertedTask.id,
+              taskTitle: insertedTask.title
+            }),
+          }).catch(err => console.error('Failed to generate embedding:', err));
+        }
+      }
 
       setNewTask('');
       setPriority('medium');
@@ -228,6 +258,42 @@ function Dashboard() {
     }
   };
 
+  const handleSmartSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    setSearching(true);
+    setError('');
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/smart-search`;
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: searchQuery }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Search failed');
+      }
+
+      const { results } = await response.json();
+      setSearchResults(results || []);
+    } catch (err: any) {
+      setError(err.message || 'Failed to perform search');
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/');
@@ -279,6 +345,73 @@ function Dashboard() {
             <h1 className="text-6xl font-bold mb-12 text-center text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-300 to-cyan-400 tracking-wide">
               Your Tasks
             </h1>
+
+            {/* Smart Search */}
+            <div className="mb-8 bg-blue-50/10 backdrop-blur-sm border-2 border-blue-400/30 rounded-xl p-6">
+              <form onSubmit={handleSmartSearch} className="space-y-4">
+                <label
+                  htmlFor="smartSearch"
+                  className="block text-blue-300 font-semibold text-lg tracking-wide"
+                >
+                  Smart Search
+                </label>
+                <div className="flex gap-3">
+                  <input
+                    id="smartSearch"
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search your tasks with AI..."
+                    className="flex-1 px-4 py-3 bg-slate-800/50 border-2 border-blue-400/30 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all duration-300 backdrop-blur-sm"
+                  />
+                  <button
+                    type="submit"
+                    disabled={searching}
+                    className="group relative px-6 py-3 bg-gradient-to-r from-blue-500/30 to-cyan-500/30 border-2 border-blue-400/50 rounded-lg text-blue-300 font-semibold tracking-wide hover:border-blue-300 hover:shadow-lg hover:shadow-blue-500/50 transition-all duration-300 backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <Search className="w-5 h-5" />
+                    <span className="relative z-10">{searching ? 'Searching...' : 'Search'}</span>
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 to-cyan-500/0 group-hover:from-blue-500/40 group-hover:to-cyan-500/40 rounded-lg transition-all duration-300"></div>
+                  </button>
+                </div>
+              </form>
+
+              {/* Search Results */}
+              {searchResults.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <h3 className="text-blue-200 text-sm font-semibold mb-2">
+                    Top Results (similarity &gt; 0.7):
+                  </h3>
+                  {searchResults.map((result) => (
+                    <div
+                      key={result.id}
+                      className="p-3 bg-blue-900/20 border border-blue-400/30 rounded-lg"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-white text-sm font-medium flex-1">{result.title}</p>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="px-2 py-1 bg-blue-500/20 border border-blue-400/40 rounded text-blue-200">
+                            {result.priority}
+                          </span>
+                          <span className="px-2 py-1 bg-slate-700/50 border border-slate-500/40 rounded text-slate-200">
+                            {result.status}
+                          </span>
+                          <span className="px-2 py-1 bg-green-500/20 border border-green-400/40 rounded text-green-200 font-semibold">
+                            {(result.similarity * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {searchQuery && searchResults.length === 0 && !searching && (
+                <div className="mt-4 p-3 bg-slate-700/20 border border-slate-500/30 rounded-lg">
+                  <p className="text-slate-300 text-sm text-center">No similar tasks found</p>
+                </div>
+              )}
+            </div>
 
           {error && (
             <div className="mb-6 bg-red-500/20 border-2 border-red-500/50 rounded-lg p-4">
