@@ -1,16 +1,36 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Login logic will be implemented later
-    console.log('Login attempted with:', { email, password });
+    setError('');
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        navigate('/dashboard');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to login');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -39,6 +59,12 @@ function Login() {
           <h1 className="text-5xl font-bold mb-12 text-center text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-300 to-cyan-400 tracking-wide">
             Login
           </h1>
+
+          {error && (
+            <div className="bg-red-500/20 border-2 border-red-500/50 rounded-lg p-4 mb-6">
+              <p className="text-red-200 text-center">{error}</p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-8">
             <div>
@@ -79,9 +105,10 @@ function Login() {
 
             <button
               type="submit"
-              className="w-full mt-10 group relative px-8 py-5 bg-gradient-to-r from-cyan-500/30 to-blue-500/30 border-2 border-cyan-400/50 rounded-lg text-cyan-300 font-bold text-xl tracking-wider hover:border-cyan-300 hover:shadow-lg hover:shadow-cyan-500/50 transition-all duration-300 backdrop-blur-sm"
+              disabled={loading}
+              className="w-full mt-10 group relative px-8 py-5 bg-gradient-to-r from-cyan-500/30 to-blue-500/30 border-2 border-cyan-400/50 rounded-lg text-cyan-300 font-bold text-xl tracking-wider hover:border-cyan-300 hover:shadow-lg hover:shadow-cyan-500/50 transition-all duration-300 backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span className="relative z-10">Login</span>
+              <span className="relative z-10">{loading ? 'Logging in...' : 'Login'}</span>
               <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/0 to-blue-500/0 group-hover:from-cyan-500/40 group-hover:to-blue-500/40 rounded-lg transition-all duration-300"></div>
             </button>
           </form>
