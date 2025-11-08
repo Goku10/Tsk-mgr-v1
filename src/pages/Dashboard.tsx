@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, Plus, Trash2, Sparkles, Save } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import Profile from '../components/Profile';
 
 type Task = {
   id: string;
@@ -271,11 +272,13 @@ function Dashboard() {
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl"></div>
 
       {/* Main content */}
-      <div className="relative z-10 w-full max-w-4xl mx-auto px-6 py-16">
-        <div className="bg-slate-900/40 backdrop-blur-xl border-2 border-cyan-400/30 rounded-2xl p-10 shadow-2xl shadow-cyan-500/20">
-          <h1 className="text-6xl font-bold mb-12 text-center text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-300 to-cyan-400 tracking-wide">
-            Your Tasks
-          </h1>
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 py-16">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Tasks Section - Left side (2/3 width) */}
+          <div className="lg:col-span-2 bg-slate-900/40 backdrop-blur-xl border-2 border-cyan-400/30 rounded-2xl p-10 shadow-2xl shadow-cyan-500/20">
+            <h1 className="text-6xl font-bold mb-12 text-center text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-300 to-cyan-400 tracking-wide">
+              Your Tasks
+            </h1>
 
           {error && (
             <div className="mb-6 bg-red-500/20 border-2 border-red-500/50 rounded-lg p-4">
@@ -466,6 +469,12 @@ function Dashboard() {
             <div className="w-2 h-2 bg-cyan-400 rounded-full animate-ping-slow"></div>
             <div className="w-2 h-2 bg-blue-400 rounded-full animate-ping-slow" style={{ animationDelay: '0.2s' }}></div>
             <div className="w-2 h-2 bg-cyan-400 rounded-full animate-ping-slow" style={{ animationDelay: '0.4s' }}></div>
+          </div>
+          </div>
+
+          {/* Profile Section - Right side (1/3 width) */}
+          <div className="lg:col-span-1">
+            <Profile />
           </div>
         </div>
       </div>
