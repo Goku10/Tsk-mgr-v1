@@ -137,6 +137,19 @@ function Signup() {
             </button>
           </form>
 
+          {/* Login link */}
+          <div className="mt-8 text-center">
+            <p className="text-slate-300">
+              Already have an account?{' '}
+              <button
+                onClick={() => navigate('/login')}
+                className="text-cyan-400 hover:text-cyan-300 font-semibold transition-colors duration-300 underline decoration-cyan-400/50 hover:decoration-cyan-300/50 underline-offset-4"
+              >
+                Log in
+              </button>
+            </p>
+          </div>
+
           {/* Decorative elements */}
           <div className="mt-8 flex justify-center gap-2">
             <div className="w-2 h-2 bg-cyan-400 rounded-full animate-ping-slow"></div>
