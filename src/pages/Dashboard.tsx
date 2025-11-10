@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { LogOut, Plus, Trash2, Sparkles, Save, Search, Copy } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Profile from '../components/Profile';
+import AnalogClock from '../components/AnalogClock';
 
 type Task = {
   id: string;
@@ -697,8 +698,9 @@ function Dashboard() {
           </div>
 
           {/* Profile Section - Right side (1/3 width) */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 space-y-6">
             <Profile />
+            <AnalogClock />
           </div>
         </div>
       </div>
