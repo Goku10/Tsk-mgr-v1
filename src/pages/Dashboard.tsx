@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Plus, Trash2, Sparkles, Save, Search } from 'lucide-react';
+import { LogOut, Plus, Trash2, Sparkles, Save, Search, Copy } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Profile from '../components/Profile';
 
@@ -173,6 +173,29 @@ function Dashboard() {
         .from('tasks')
         .delete()
         .eq('id', taskId);
+
+      if (error) throw error;
+      fetchTasks();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleDuplicateTask = async (task: Task) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('tasks')
+        .insert({
+          user_id: user.id,
+          title: task.title,
+          priority: task.priority,
+          status: 'pending',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
 
       if (error) throw error;
       fetchTasks();
@@ -546,13 +569,22 @@ function Dashboard() {
                           </div>
                         )}
                       </div>
-                      <button
-                        onClick={() => handleDeleteTask(task.id)}
-                        className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-all duration-300"
-                        title="Delete task"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={() => handleDeleteTask(task.id)}
+                          className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-all duration-300"
+                          title="Delete task"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDuplicateTask(task)}
+                          className="p-2 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/20 rounded-lg transition-all duration-300"
+                          title="Duplicate task"
+                        >
+                          <Copy className="w-5 h-5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
