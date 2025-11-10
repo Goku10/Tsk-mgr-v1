@@ -1,7 +1,17 @@
 import { useEffect, useState } from 'react';
+import { Cloud, CloudRain, CloudSnow, Sun, CloudDrizzle, Wind, CloudFog } from 'lucide-react';
+
+type WeatherData = {
+  temp: number;
+  description: string;
+  icon: string;
+  city: string;
+};
 
 export default function AnalogClock() {
   const [time, setTime] = useState(new Date());
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -10,6 +20,141 @@ export default function AnalogClock() {
 
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    fetchWeather();
+    const weatherInterval = setInterval(fetchWeather, 600000);
+    return () => clearInterval(weatherInterval);
+  }, []);
+
+  const fetchWeather = async () => {
+    try {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const { latitude, longitude } = position.coords;
+
+            const response = await fetch(
+              `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&temperature_unit=fahrenheit&timezone=auto`
+            );
+
+            const data = await response.json();
+
+            const geocodeResponse = await fetch(
+              `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${latitude}&longitude=${longitude}`
+            );
+            const geocodeData = await geocodeResponse.json();
+
+            const city = geocodeData.results?.[0]?.name || geocodeData.results?.[0]?.admin1 || 'Unknown Location';
+
+            setWeather({
+              temp: Math.round(data.current.temperature_2m),
+              description: getWeatherDescription(data.current.weather_code),
+              icon: getWeatherIcon(data.current.weather_code),
+              city: city
+            });
+            setLoading(false);
+          },
+          (error) => {
+            console.error('Geolocation error:', error);
+            fetchWeatherByIP();
+          }
+        );
+      } else {
+        fetchWeatherByIP();
+      }
+    } catch (error) {
+      console.error('Weather fetch error:', error);
+      setLoading(false);
+    }
+  };
+
+  const fetchWeatherByIP = async () => {
+    try {
+      const ipResponse = await fetch('https://ipapi.co/json/');
+      const ipData = await ipResponse.json();
+
+      const response = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${ipData.latitude}&longitude=${ipData.longitude}&current=temperature_2m,weather_code&temperature_unit=fahrenheit&timezone=auto`
+      );
+
+      const data = await response.json();
+
+      setWeather({
+        temp: Math.round(data.current.temperature_2m),
+        description: getWeatherDescription(data.current.weather_code),
+        icon: getWeatherIcon(data.current.weather_code),
+        city: ipData.city || 'Unknown Location'
+      });
+      setLoading(false);
+    } catch (error) {
+      console.error('IP-based weather fetch error:', error);
+      setLoading(false);
+    }
+  };
+
+  const getWeatherDescription = (code: number): string => {
+    const weatherCodes: { [key: number]: string } = {
+      0: 'Clear',
+      1: 'Mainly Clear',
+      2: 'Partly Cloudy',
+      3: 'Overcast',
+      45: 'Foggy',
+      48: 'Foggy',
+      51: 'Light Drizzle',
+      53: 'Drizzle',
+      55: 'Heavy Drizzle',
+      61: 'Light Rain',
+      63: 'Rain',
+      65: 'Heavy Rain',
+      71: 'Light Snow',
+      73: 'Snow',
+      75: 'Heavy Snow',
+      77: 'Snow Grains',
+      80: 'Light Showers',
+      81: 'Showers',
+      82: 'Heavy Showers',
+      85: 'Light Snow Showers',
+      86: 'Snow Showers',
+      95: 'Thunderstorm',
+      96: 'Thunderstorm',
+      99: 'Thunderstorm'
+    };
+    return weatherCodes[code] || 'Unknown';
+  };
+
+  const getWeatherIcon = (code: number): string => {
+    if (code === 0 || code === 1) return 'sun';
+    if (code === 2 || code === 3) return 'cloud';
+    if (code >= 45 && code <= 48) return 'fog';
+    if (code >= 51 && code <= 57) return 'drizzle';
+    if (code >= 61 && code <= 67) return 'rain';
+    if (code >= 71 && code <= 77) return 'snow';
+    if (code >= 80 && code <= 82) return 'rain';
+    if (code >= 85 && code <= 86) return 'snow';
+    if (code >= 95) return 'rain';
+    return 'cloud';
+  };
+
+  const WeatherIcon = ({ icon }: { icon: string }) => {
+    const iconClass = "w-8 h-8 text-cyan-300";
+    switch (icon) {
+      case 'sun':
+        return <Sun className={iconClass} />;
+      case 'rain':
+        return <CloudRain className={iconClass} />;
+      case 'snow':
+        return <CloudSnow className={iconClass} />;
+      case 'drizzle':
+        return <CloudDrizzle className={iconClass} />;
+      case 'fog':
+        return <CloudFog className={iconClass} />;
+      case 'wind':
+        return <Wind className={iconClass} />;
+      default:
+        return <Cloud className={iconClass} />;
+    }
+  };
 
   const hours = time.getHours() % 12;
   const minutes = time.getMinutes();
@@ -22,6 +167,28 @@ export default function AnalogClock() {
   return (
     <div className="bg-slate-900/40 backdrop-blur-xl border-2 border-cyan-400/30 rounded-2xl p-8 shadow-2xl shadow-cyan-500/20">
       <div className="flex flex-col items-center gap-4">
+        {weather && (
+          <div className="w-full flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <WeatherIcon icon={weather.icon} />
+              <div>
+                <p className="text-2xl font-bold text-cyan-300">{weather.temp}°F</p>
+                <p className="text-xs text-slate-400">{weather.description}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-semibold text-cyan-300">{weather.city}</p>
+              <p className="text-xs text-slate-400">Local Time</p>
+            </div>
+          </div>
+        )}
+
+        {loading && !weather && (
+          <div className="w-full text-center mb-2">
+            <p className="text-xs text-slate-400">Loading weather...</p>
+          </div>
+        )}
+
         <div className="relative w-48 h-48">
           <svg viewBox="0 0 200 200" className="w-full h-full">
             <defs>
