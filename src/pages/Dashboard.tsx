@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Plus, Trash2, Sparkles, Save, Search, Copy } from 'lucide-react';
+import { LogOut, Plus, Trash2, Sparkles, Save, Search, Copy, X, Calendar as CalendarIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Profile from '../components/Profile';
 import AnalogClock from '../components/AnalogClock';
+import Calendar from '../components/Calendar';
 
 type Task = {
   id: string;
@@ -11,6 +12,7 @@ type Task = {
   priority: 'low' | 'medium' | 'high';
   status: 'pending' | 'in-progress' | 'done';
   created_at: string;
+  scheduled_date: string | null;
 };
 
 type Subtask = {
@@ -76,6 +78,11 @@ function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState('');
+  const [scheduledTime, setScheduledTime] = useState('');
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null);
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [editingTaskDate, setEditingTaskDate] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const getDailyQuote = () => {
@@ -141,13 +148,21 @@ function Dashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      let scheduledDateTime = null;
+      if (scheduledDate) {
+        scheduledDateTime = scheduledTime
+          ? `${scheduledDate}T${scheduledTime}:00`
+          : `${scheduledDate}T00:00:00`;
+      }
+
       const { data: insertedTask, error } = await supabase
         .from('tasks')
         .insert([{
           user_id: user.id,
           title: newTask,
           priority,
-          status: 'pending'
+          status: 'pending',
+          scheduled_date: scheduledDateTime
         }])
         .select()
         .single();
@@ -173,6 +188,8 @@ function Dashboard() {
 
       setNewTask('');
       setPriority('medium');
+      setScheduledDate('');
+      setScheduledTime('');
       fetchTasks();
     } catch (err: any) {
       setError(err.message);
@@ -394,6 +411,83 @@ function Dashboard() {
     }
   };
 
+  const isToday = (date: string) => {
+    const today = new Date();
+    const taskDate = new Date(date);
+    return (
+      today.getFullYear() === taskDate.getFullYear() &&
+      today.getMonth() === taskDate.getMonth() &&
+      today.getDate() === taskDate.getDate()
+    );
+  };
+
+  const getFilteredTasks = () => {
+    return tasks.filter(task => {
+      if (!task.scheduled_date) return true;
+      return isToday(task.scheduled_date);
+    });
+  };
+
+  const getTasksForDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const day = date.getDate();
+
+    return tasks.filter(task => {
+      if (!task.scheduled_date) return false;
+      const taskDate = new Date(task.scheduled_date);
+      return (
+        taskDate.getFullYear() === year &&
+        taskDate.getMonth() === month &&
+        taskDate.getDate() === day
+      );
+    });
+  };
+
+  const getTaskDates = () => {
+    return tasks
+      .filter(task => task.scheduled_date)
+      .map(task => task.scheduled_date as string);
+  };
+
+  const handleUpdateTaskDate = async (taskId: string, newDate: string | null, newTime: string | null) => {
+    try {
+      let scheduledDateTime = null;
+      if (newDate) {
+        scheduledDateTime = newTime
+          ? `${newDate}T${newTime}:00`
+          : `${newDate}T00:00:00`;
+      }
+
+      const { error } = await supabase
+        .from('tasks')
+        .update({ scheduled_date: scheduledDateTime, updated_at: new Date().toISOString() })
+        .eq('id', taskId);
+
+      if (error) throw error;
+      await fetchTasks();
+      setEditingTaskDate(null);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleDateClick = (date: Date) => {
+    setSelectedCalendarDate(date);
+    setShowDateModal(true);
+  };
+
+  const formatDateTime = (dateTimeStr: string) => {
+    const date = new Date(dateTimeStr);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
@@ -498,11 +592,14 @@ function Dashboard() {
 
           {/* Task List */}
           <div className="mb-12 bg-slate-800/30 backdrop-blur-sm border-2 border-cyan-400/20 rounded-xl p-8">
-            {tasks.length === 0 ? (
-              <p className="text-slate-400 text-center text-lg">No tasks yet. Add your first task below!</p>
+            <h2 className="text-2xl font-bold text-cyan-300 mb-4">
+              {getFilteredTasks().length === 0 ? 'No Tasks Today' : "Today's Tasks & Unscheduled"}
+            </h2>
+            {getFilteredTasks().length === 0 ? (
+              <p className="text-slate-400 text-center text-lg">No tasks for today. Add your first task below!</p>
             ) : (
               <div className="space-y-4">
-                {tasks.map((task) => (
+                {getFilteredTasks().map((task) => (
                   <div
                     key={task.id}
                     className="bg-slate-900/40 backdrop-blur-sm border-2 border-cyan-400/20 rounded-lg p-6 hover:border-cyan-400/40 transition-all duration-300"
@@ -529,6 +626,40 @@ function Dashboard() {
                             <option value="in-progress">In Progress</option>
                             <option value="done">Done</option>
                           </select>
+                          {editingTaskDate === task.id ? (
+                            <div className="flex gap-2 items-center">
+                              <input
+                                type="date"
+                                defaultValue={task.scheduled_date ? task.scheduled_date.split('T')[0] : ''}
+                                onChange={(e) => {
+                                  const dateVal = e.target.value;
+                                  const timeVal = task.scheduled_date ? task.scheduled_date.split('T')[1]?.slice(0, 5) : null;
+                                  handleUpdateTaskDate(task.id, dateVal || null, timeVal);
+                                }}
+                                className="px-2 py-1 bg-slate-800/50 border border-cyan-400/30 rounded text-white text-xs"
+                              />
+                              <button
+                                onClick={() => handleUpdateTaskDate(task.id, null, null)}
+                                className="px-2 py-1 bg-red-500/20 border border-red-500/50 rounded text-red-300 text-xs hover:bg-red-500/30"
+                              >
+                                Clear
+                              </button>
+                              <button
+                                onClick={() => setEditingTaskDate(null)}
+                                className="px-2 py-1 bg-slate-500/20 border border-slate-500/50 rounded text-slate-300 text-xs hover:bg-slate-500/30"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setEditingTaskDate(task.id)}
+                              className="px-3 py-1 bg-purple-500/20 border-2 border-purple-400/50 rounded-lg text-purple-300 text-sm font-semibold hover:bg-purple-500/30 transition-all flex items-center gap-1"
+                            >
+                              <CalendarIcon className="w-3 h-3" />
+                              {task.scheduled_date ? formatDateTime(task.scheduled_date) : 'Set Date'}
+                            </button>
+                          )}
                         </div>
 
                         {/* Generate Subtasks Button */}
@@ -649,8 +780,8 @@ function Dashboard() {
                 placeholder="Enter a new task"
                 className="w-full px-5 py-4 bg-slate-800/50 border-2 border-cyan-400/30 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all duration-300 backdrop-blur-sm text-lg"
               />
-              <div className="flex gap-4">
-                <div className="flex-1">
+              <div className="flex gap-4 flex-wrap">
+                <div className="flex-1 min-w-[200px]">
                   <label htmlFor="priority" className="block text-cyan-300 font-semibold mb-2 text-sm tracking-wide">
                     Priority
                   </label>
@@ -665,6 +796,34 @@ function Dashboard() {
                     <option value="high">High</option>
                   </select>
                 </div>
+                <div className="flex-1 min-w-[200px]">
+                  <label htmlFor="scheduledDate" className="block text-cyan-300 font-semibold mb-2 text-sm tracking-wide">
+                    <CalendarIcon className="w-4 h-4 inline-block mr-1" />
+                    Date (Optional)
+                  </label>
+                  <input
+                    id="scheduledDate"
+                    type="date"
+                    value={scheduledDate}
+                    onChange={(e) => setScheduledDate(e.target.value)}
+                    className="w-full px-5 py-4 bg-slate-800/50 border-2 border-cyan-400/30 rounded-lg text-white focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all duration-300 backdrop-blur-sm text-lg"
+                  />
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <label htmlFor="scheduledTime" className="block text-cyan-300 font-semibold mb-2 text-sm tracking-wide">
+                    Time (Optional)
+                  </label>
+                  <input
+                    id="scheduledTime"
+                    type="time"
+                    value={scheduledTime}
+                    onChange={(e) => setScheduledTime(e.target.value)}
+                    disabled={!scheduledDate}
+                    className="w-full px-5 py-4 bg-slate-800/50 border-2 border-cyan-400/30 rounded-lg text-white focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all duration-300 backdrop-blur-sm text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-4">
                 <button
                   type="submit"
                   className="group relative px-8 py-4 bg-gradient-to-r from-cyan-500/30 to-blue-500/30 border-2 border-cyan-400/50 rounded-lg text-cyan-300 font-bold text-lg tracking-wider hover:border-cyan-300 hover:shadow-lg hover:shadow-cyan-500/50 transition-all duration-300 backdrop-blur-sm flex items-center gap-2 min-w-[180px] justify-center self-end"
@@ -701,9 +860,96 @@ function Dashboard() {
           <div className="lg:col-span-1 space-y-6">
             <Profile />
             <AnalogClock />
+            <Calendar
+              taskDates={getTaskDates()}
+              onDateClick={handleDateClick}
+              selectedDate={selectedCalendarDate}
+            />
           </div>
         </div>
       </div>
+
+      {/* Modal for viewing tasks on selected date */}
+      {showDateModal && selectedCalendarDate && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border-2 border-cyan-400/50 rounded-2xl p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-300">
+                Tasks for {selectedCalendarDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowDateModal(false);
+                  setSelectedCalendarDate(null);
+                }}
+                className="p-2 hover:bg-cyan-500/20 rounded-lg transition-colors border border-cyan-400/30"
+              >
+                <X className="w-6 h-6 text-cyan-300" />
+              </button>
+            </div>
+
+            {getTasksForDate(selectedCalendarDate).length === 0 ? (
+              <p className="text-slate-400 text-center text-lg py-8">No tasks scheduled for this date</p>
+            ) : (
+              <div className="space-y-4">
+                {getTasksForDate(selectedCalendarDate).map((task) => (
+                  <div
+                    key={task.id}
+                    className="bg-slate-800/50 border-2 border-cyan-400/20 rounded-lg p-6 hover:border-cyan-400/40 transition-all"
+                  >
+                    <h3 className="text-white text-xl font-semibold mb-3">{task.title}</h3>
+                    <div className="flex flex-wrap gap-3 mb-3">
+                      <select
+                        value={task.priority}
+                        onChange={(e) => handlePriorityChange(task.id, e.target.value as any)}
+                        className={`px-3 py-1 rounded-lg border-2 text-sm font-semibold cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-400/50 ${getPriorityColor(task.priority)}`}
+                      >
+                        <option value="low">Priority: LOW</option>
+                        <option value="medium">Priority: MEDIUM</option>
+                        <option value="high">Priority: HIGH</option>
+                      </select>
+                      <select
+                        value={task.status}
+                        onChange={(e) => handleStatusChange(task.id, e.target.value as any)}
+                        className={`px-3 py-1 rounded-lg border-2 text-sm font-semibold cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-400/50 ${getStatusColor(task.status)}`}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="done">Done</option>
+                      </select>
+                      {task.scheduled_date && (
+                        <span className="px-3 py-1 bg-purple-500/20 border-2 border-purple-400/50 rounded-lg text-purple-300 text-sm font-semibold flex items-center gap-1">
+                          <CalendarIcon className="w-3 h-3" />
+                          {formatDateTime(task.scheduled_date)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => handleDeleteTask(task.id)}
+                        className="px-4 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm font-semibold hover:bg-red-500/30 transition-all flex items-center gap-2"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleUpdateTaskDate(task.id, null, null);
+                          setShowDateModal(false);
+                          setSelectedCalendarDate(null);
+                        }}
+                        className="px-4 py-2 bg-cyan-500/20 border border-cyan-400/50 rounded-lg text-cyan-300 text-sm font-semibold hover:bg-cyan-500/30 transition-all"
+                      >
+                        Move to Dashboard
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
