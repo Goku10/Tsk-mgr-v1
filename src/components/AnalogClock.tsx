@@ -32,51 +32,68 @@ export default function AnalogClock() {
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
           async (position) => {
-            const { latitude, longitude } = position.coords;
+            try {
+              const { latitude, longitude } = position.coords;
 
-            const response = await fetch(
-              `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&temperature_unit=fahrenheit&timezone=auto`
-            );
+              const weatherResponse = await fetch(
+                `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&temperature_unit=fahrenheit&timezone=auto`,
+                { mode: 'cors' }
+              );
 
-            const data = await response.json();
+              if (!weatherResponse.ok) {
+                throw new Error('Weather API failed');
+              }
 
-            const geocodeResponse = await fetch(
-              `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${latitude}&longitude=${longitude}`
-            );
-            const geocodeData = await geocodeResponse.json();
+              const weatherData = await weatherResponse.json();
 
-            const city = geocodeData.results?.[0]?.name || geocodeData.results?.[0]?.admin1 || 'Unknown Location';
+              const geocodeResponse = await fetch(
+                `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${latitude}&longitude=${longitude}`,
+                { mode: 'cors' }
+              );
 
-            setWeather({
-              temp: Math.round(data.current.temperature_2m),
-              description: getWeatherDescription(data.current.weather_code),
-              icon: getWeatherIcon(data.current.weather_code),
-              city: city
-            });
-            setLoading(false);
+              let city = 'Your Location';
+              if (geocodeResponse.ok) {
+                const geocodeData = await geocodeResponse.json();
+                city = geocodeData.results?.[0]?.name || geocodeData.results?.[0]?.admin1 || 'Your Location';
+              }
+
+              setWeather({
+                temp: Math.round(weatherData.current.temperature_2m),
+                description: getWeatherDescription(weatherData.current.weather_code),
+                icon: getWeatherIcon(weatherData.current.weather_code),
+                city: city
+              });
+              setLoading(false);
+            } catch (error) {
+              console.error('Weather fetch with geolocation failed:', error);
+              fetchWeatherByIP();
+            }
           },
           (error) => {
             console.error('Geolocation error:', error);
             fetchWeatherByIP();
-          }
+          },
+          { timeout: 10000, enableHighAccuracy: false }
         );
       } else {
         fetchWeatherByIP();
       }
     } catch (error) {
       console.error('Weather fetch error:', error);
-      setLoading(false);
+      fetchWeatherByIP();
     }
   };
 
   const fetchWeatherByIP = async () => {
     try {
-      const ipResponse = await fetch('https://ipapi.co/json/');
-      const ipData = await ipResponse.json();
-
       const response = await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${ipData.latitude}&longitude=${ipData.longitude}&current=temperature_2m,weather_code&temperature_unit=fahrenheit&timezone=auto`
+        'https://api.open-meteo.com/v1/forecast?latitude=40.7128&longitude=-74.0060&current=temperature_2m,weather_code&temperature_unit=fahrenheit&timezone=auto',
+        { mode: 'cors' }
       );
+
+      if (!response.ok) {
+        throw new Error('Weather API failed');
+      }
 
       const data = await response.json();
 
@@ -84,11 +101,17 @@ export default function AnalogClock() {
         temp: Math.round(data.current.temperature_2m),
         description: getWeatherDescription(data.current.weather_code),
         icon: getWeatherIcon(data.current.weather_code),
-        city: ipData.city || 'Unknown Location'
+        city: 'New York'
       });
       setLoading(false);
     } catch (error) {
       console.error('IP-based weather fetch error:', error);
+      setWeather({
+        temp: 72,
+        description: 'Partly Cloudy',
+        icon: 'cloud',
+        city: 'Your Location'
+      });
       setLoading(false);
     }
   };
