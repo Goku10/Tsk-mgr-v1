@@ -28,6 +28,39 @@ type SearchResult = {
   similarity: number;
 };
 
+const motivationalQuotes = [
+  "The secret of getting ahead is getting started.",
+  "Don't watch the clock; do what it does. Keep going.",
+  "The future depends on what you do today.",
+  "Success is the sum of small efforts repeated day in and day out.",
+  "You don't have to be great to start, but you have to start to be great.",
+  "The only way to do great work is to love what you do.",
+  "Focus on being productive instead of busy.",
+  "Action is the foundational key to all success.",
+  "Your limitation—it's only your imagination.",
+  "Great things never come from comfort zones.",
+  "Success doesn't just find you. You have to go out and get it.",
+  "Dream it. Wish it. Do it.",
+  "Little things make big days.",
+  "It's going to be hard, but hard does not mean impossible.",
+  "Don't stop when you're tired. Stop when you're done.",
+  "Wake up with determination. Go to bed with satisfaction.",
+  "Do something today that your future self will thank you for.",
+  "The harder you work for something, the greater you'll feel when you achieve it.",
+  "Dream bigger. Do bigger.",
+  "Don't wait for opportunity. Create it.",
+  "Sometimes we're tested not to show our weaknesses, but to discover our strengths.",
+  "The key to success is to focus on goals, not obstacles.",
+  "Make each day your masterpiece.",
+  "Opportunities don't happen, you create them.",
+  "Success is not final, failure is not fatal: It is the courage to continue that counts.",
+  "Believe you can and you're halfway there.",
+  "The only limit to our realization of tomorrow is our doubts of today.",
+  "Start where you are. Use what you have. Do what you can.",
+  "Every accomplishment starts with the decision to try.",
+  "Your time is limited, don't waste it living someone else's life."
+];
+
 function Dashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [subtasks, setSubtasks] = useState<Record<string, Subtask[]>>({});
@@ -43,6 +76,12 @@ function Dashboard() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const navigate = useNavigate();
+
+  const getDailyQuote = () => {
+    const today = new Date();
+    const dayOfYear = Math.floor((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000);
+    return motivationalQuotes[dayOfYear % motivationalQuotes.length];
+  };
 
   useEffect(() => {
     fetchTasks();
@@ -379,8 +418,8 @@ function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Tasks Section - Left side (2/3 width) */}
           <div className="lg:col-span-2 bg-slate-900/40 backdrop-blur-xl border-2 border-cyan-400/30 rounded-2xl p-10 shadow-2xl shadow-cyan-500/20">
-            <h1 className="text-6xl font-bold mb-12 text-center text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-300 to-cyan-400 tracking-wide">
-              Your Tasks
+            <h1 className="text-5xl font-bold mb-12 text-center text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-300 to-cyan-400 tracking-wide leading-tight">
+              {getDailyQuote()}
             </h1>
 
             {/* Smart Search */}
