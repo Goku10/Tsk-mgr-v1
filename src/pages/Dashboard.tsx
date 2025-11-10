@@ -153,6 +153,20 @@ function Dashboard() {
     }
   };
 
+  const handlePriorityChange = async (taskId: string, newPriority: 'low' | 'medium' | 'high') => {
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ priority: newPriority, updated_at: new Date().toISOString() })
+        .eq('id', taskId);
+
+      if (error) throw error;
+      fetchTasks();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
   const handleDeleteTask = async (taskId: string) => {
     try {
       const { error } = await supabase
@@ -434,9 +448,15 @@ function Dashboard() {
                       <div className="flex-1">
                         <h3 className="text-white text-xl font-semibold mb-3">{task.title}</h3>
                         <div className="flex flex-wrap gap-3 mb-4">
-                          <div className={`px-3 py-1 rounded-lg border-2 text-sm font-semibold ${getPriorityColor(task.priority)}`}>
-                            Priority: {task.priority.toUpperCase()}
-                          </div>
+                          <select
+                            value={task.priority}
+                            onChange={(e) => handlePriorityChange(task.id, e.target.value as any)}
+                            className={`px-3 py-1 rounded-lg border-2 text-sm font-semibold cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-400/50 ${getPriorityColor(task.priority)}`}
+                          >
+                            <option value="low">Priority: LOW</option>
+                            <option value="medium">Priority: MEDIUM</option>
+                            <option value="high">Priority: HIGH</option>
+                          </select>
                           <select
                             value={task.status}
                             onChange={(e) => handleStatusChange(task.id, e.target.value as any)}
